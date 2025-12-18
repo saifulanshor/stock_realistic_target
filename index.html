@@ -46,6 +46,25 @@ small{font-size:11px;color:var(--muted)}
 @media(max-width:800px){
   .grid,.targets,.panels{grid-template-columns:1fr}
 }
+
+.score{
+  margin-top:14px;
+  padding:16px;
+  border-radius:16px;
+  border:1px solid var(--line);
+}
+.score-value{
+  font-size:28px;
+  font-weight:800;
+}
+.score-good{color:#22c55e}
+.score-mid{color:#eab308}
+.score-bad{color:#ef4444}
+.score-label{
+  margin-top:6px;
+  font-size:13px;
+  color:#cbd5f5;
+}
 </style>
 </head>
 
@@ -96,6 +115,7 @@ small{font-size:11px;color:var(--muted)}
 <div class="card">
 <h3>📈 Output</h3>
 <div id="summary"></div>
+<div id="bandarScore"></div>
 <div id="targets"></div>
 </div>
 </div>
@@ -114,6 +134,64 @@ async function fetchPrice(){
   document.getElementById('priceNote').innerText =
     'Harga closing hari bursa terakhir (via Yahoo! Finance)';
 }
+
+async function hitungBandarScore(ticker){
+  const res = await fetch(
+    `https://yahoo-proxy.saifulanshor48.workers.dev/?symbol=${ticker}&mode=ohlc`
+  );
+
+  const data = await res.json();
+
+  // === Data 20 hari ===
+  const closes = data.close;
+  const highs = data.high;
+  const lows = data.low;
+  const volumes = data.volume;
+
+  const n = closes.length - 1;
+
+  const close = closes[n];
+  const high = highs[n];
+  const low = lows[n];
+  const volume = volumes[n];
+
+  // === Average ===
+  const avgVol = volumes.reduce((a,b)=>a+b,0)/volumes.length;
+  const avgRange = highs.map((h,i)=>h-lows[i])
+    .reduce((a,b)=>a+b,0)/highs.length;
+
+  let score = 0;
+
+  // 1️⃣ Volume besar
+  if(volume > avgVol) score += 25;
+
+  // 2️⃣ Close di atas midpoint
+  if(close > (high+low)/2) score += 20;
+
+  // 3️⃣ Range efisien
+  if((high-low) < avgRange) score += 15;
+
+  // 4️⃣ Higher close
+  if(close >= closes[n-1]) score += 15;
+
+  // 5️⃣ Tidak distribusi
+  if(!((high-low) > avgRange*1.8 && volume > avgVol*1.5)) score += 25;
+
+  // === Label ===
+  let label, cls;
+  if(score >= 70){ label="🟢 Akumulasi Bandar"; cls="score-good"; }
+  else if(score >= 40){ label="🟡 Netral / Build-up"; cls="score-mid"; }
+  else{ label="🔴 Distribusi / Risiko"; cls="score-bad"; }
+
+  document.getElementById("bandarScore").innerHTML = `
+    <div class="score">
+      <div class="p-title">Bandar Score</div>
+      <div class="score-value ${cls}">${score}/100</div>
+      <div class="score-label">${label}</div>
+    </div>
+  `;
+}
+
 
 
 
@@ -182,6 +260,8 @@ function hitung(){
       <div class="gain">Gain: Rp ${gainHigh.toFixed(2)} (${(gainHigh/current*100).toFixed(2)}%)</div>
     </div>
   </div>`;
+
+  hitungBandarScore(ticker);
 }
 </script>
 </body>
