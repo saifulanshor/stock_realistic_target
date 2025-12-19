@@ -78,37 +78,38 @@ small{font-size:11px;color:var(--muted)}
 <h3>🧮 Input Data</h3>
 
 <label>Ticker Saham</label>
-<input id="ticker" placeholder="BBRI">
+<input id="ticker" placeholder="BBRI" oninput="onTickerInput()">
 
 <label>Kode Broker</label>
-<input id="broker" placeholder="YU">
+<input id="broker" placeholder="YU" oninput="autoCapitalizeBroker()">
 
 <label>Harga Saat Ini</label>
+<small id="statusHint">Masukkan ticker lalu ambil harga</small>
 <div style="display:flex;gap:6px">
-  <input id="currentPrice" type="number" style="flex:1">
+  <input id="currentPrice" type="number" style="flex:1" oninput="validateForm()">
   <button type="button" onclick="fetchPrice()">🔄 Ambil</button>
 </div>
 <small id="priceNote"></small>
 
 <label>Buy Average</label>
-<input id="buyAvg" type="number">
+<input id="buyAvg" type="number" disabled oninput="validateForm()">
 
 <label>Buy Lot</label>
-<input id="buyLot" type="number">
+<input id="buyLot" type="number" disabled oninput="validateForm()">
 
 <label>Total Bid (lot)</label>
-<input id="totalBid" type="number">
+<input id="totalBid" type="number" disabled oninput="validateForm()">
 
 <label>Total Offer (lot)</label>
-<input id="totalOffer" type="number">
+<input id="totalOffer" type="number" disabled oninput="validateForm()">
 
 <label>Jumlah Papan</label>
-<input id="jumlahPapan" type="number" step="0.01">
+<input id="jumlahPapan" type="number" step="0.01" disabled oninput="validateForm()">
 
 <label>Tick Size</label>
 <input id="tick" disabled>
 
-<button style="margin-top:14px;width:100%" onclick="hitung()">Hitung Target</button>
+<button id="btnHitung" disabled style="margin-top:14px;width:100%" onclick="hitung()">Hitung Target</button>
 </div>
 
 <!-- OUTPUT -->
@@ -133,7 +134,36 @@ async function fetchPrice(){
   document.getElementById('currentPrice').value = data.close;
   document.getElementById('priceNote').innerText =
     'Harga closing hari bursa terakhir (via Yahoo! Finance)';
+  
+  document.getElementById('statusHint').innerText =
+    'Harga diambil, lengkapi data lalu hitung target';
+  
+    enableInputs();
 }
+
+function enableInputs(){
+  ['buyAvg','buyLot','totalBid','totalOffer','jumlahPapan']
+    .forEach(id => document.getElementById(id).disabled = false);
+}
+
+function autoCapitalizeBroker(){
+  const el = document.getElementById('broker');
+  el.value = el.value.toUpperCase().replace(/[^A-Z]/g,'').slice(0,2);
+}
+
+function validateForm(){
+  const required = [
+    'currentPrice','buyAvg','buyLot',
+    'totalBid','totalOffer','jumlahPapan'
+  ];
+
+  const ok = required.every(id =>
+    document.getElementById(id).value
+  );
+
+  document.getElementById('btnHitung').disabled = !ok;
+}
+
 
 async function hitungBandarScore(ticker){
   const res = await fetch(
@@ -192,7 +222,59 @@ async function hitungBandarScore(ticker){
   `;
 }
 
+let tickerTimer;
 
+function onTickerInput(){
+  clearTimeout(tickerTimer);
+
+  const el = document.getElementById('ticker');
+  el.value = el.value.toUpperCase();
+
+  tickerTimer = setTimeout(()=>{
+    resetOnTickerChange();
+  }, 500); // reset setelah user berhenti ngetik
+}
+
+
+let lastTicker = '';
+
+function resetOnTickerChange(){
+
+const current = document.getElementById('ticker').value.toUpperCase();
+  if (current === lastTicker) return;
+
+  lastTicker = current;
+  // ===== Reset input angka =====
+  const fields = [
+    'broker',
+    'currentPrice',
+    'buyAvg',
+    'buyLot',
+    'totalBid',
+    'totalOffer',
+    'jumlahPapan',
+    'tick'
+  ];
+
+  fields.forEach(id => {
+    const el = document.getElementById(id);
+    if (el) el.value = '';
+  });
+
+  // ===== Reset output =====
+  const summary = document.getElementById('summary');
+  const targets = document.getElementById('targets');
+  const bandar = document.getElementById('bandarScore');
+  const note = document.getElementById('priceNote');
+
+  if (summary) summary.innerHTML = '';
+  if (targets) targets.innerHTML = '';
+  if (bandar) bandar.innerHTML = '';
+  if (note) note.innerText = '';
+
+  // ===== Optional: console log (debug) =====
+  console.log('Data di-reset karena ticker berubah');
+}
 
 
 // ===== HITUNG TARGET =====
